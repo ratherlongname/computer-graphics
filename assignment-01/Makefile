@@ -4,7 +4,7 @@
 run: a.out
 	./$^
 
-a.out: test.cpp
+a.out: main.cpp
 	gcc -o $@ $^ -lGL -lGLU -lglut
 
 clean:
