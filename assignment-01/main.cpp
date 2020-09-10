@@ -1,77 +1,159 @@
+/*
+*	CS 461 Computer Graphics Assignment 01
+*	 - Display model from obj file
+*	 - Left click to change color
+*	 - Right click to switch between FILL and OUTLINE mode
+*	
+*	Shivam Bansal
+*	Roll no 170101063
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
 #include <GL/glut.h>
 
-void display() {
-	glClear(GL_COLOR_BUFFER_BIT);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+#define MAX_VERTICES 1000
+#define MAX_FACES 10000
+#define MAX_OBJ_LINE_LENGTH 128
 
-	// read .obj file
-	float v[502][3];
-	int f[1000][3];
-	FILE* obj_file = fopen("./lowpolybunny.obj", "r");
-	char* buf[128];
-	int v_index = 0;
-	int f_index = 0;
+static GLfloat vertex_color[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}; // Colors for vertices
+static bool is_polygon_mode_fill = true; // Store if current mode is FILL or OUTLINE
+
+void read_obj_file(const char file_name[], float v[MAX_VERTICES][3], int f[MAX_FACES][3], int &v_index, int &f_index) {
+	FILE* obj_file = fopen(file_name, "r");
+	char* buf[MAX_OBJ_LINE_LENGTH];
 
 	while(true) {
 		char v_or_f;
-		int ret = fscanf(obj_file, "%c", &v_or_f);
+		int ret_val = fscanf(obj_file, "%c", &v_or_f);
 		
-		if(ret == EOF) break;
+		if(ret_val == EOF) break;
 		else if(v_or_f == 'v') {
 			fscanf(obj_file, " %f %f %f ", &v[v_index][0], &v[v_index][1], &v[v_index][2]);
+			// printf("vertex read: v %f %f %f\n", v[v_index][0], v[v_index][1], v[v_index][2]);
 			v_index++;
-			if(v_index > 502) {
-				printf("too many vertices!\n");
-				break;
+			
+			if(v_index > MAX_VERTICES) {
+				printf("Error: Number of vertices in obj file exceeds MAX_VERTICES.\n");
+				exit(1);
 			}
-			// printf("vertex!\n");
 		}
 		else if(v_or_f == 'f') {
 			fscanf(obj_file, " %d %d %d ", &f[f_index][0], &f[f_index][1], &f[f_index][2]);
+			// printf("face read: f %d %d %d\n", f[f_index][0], f[f_index][1], f[f_index][2]);
 			f_index++;
-			if(f_index > 1000) {
-				printf("too many faces!\n");
-				break;
+
+			if(f_index > MAX_FACES) {
+				printf("Error: Number of faces in obj file exceeds MAX_FACES.\n");
+				exit(1);
 			}
-			// printf("face!\n");
+		}
+		else {
+			printf("Error: Unexpected error in reading obj file.\n");
+			exit(1);
 		}
 	}
 
+	return;
+}
+
+void display() {
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// Read OBJ file
+	char file_name[] = "./lowpolybunny.obj";
+	float v[MAX_VERTICES][3];
+	int f[MAX_VERTICES][3];
+	int v_index = 0, f_index = 0;
+	read_obj_file(file_name, v, f, v_index, f_index);
 
 	glBegin(GL_TRIANGLES);
-
 	
 	// printf("v_index = %d, f_index = %d\n", v_index, f_index);
-	// for(int i = 0 ; i < 502 ; i++) {
+	// for(int i = 0 ; i < v_index ; i++) {
 	// 	printf("v %f, %f, %f\n", v[i][0], v[i][1], v[i][2]);
 	// }
+	// for(int i = 0 ; i < f_index ; i++) {
+	// 	printf("f %d, %d, %d\n", f[i][0], f[i][1], f[i][2]);
+	// }
 
-	for(int i = 0 ; i < 1000 ; i++) {
+	// Draw all faces
+	for(int i = 0 ; i < f_index ; i++) {
 		int v_1 = f[i][0];
 		int v_2 = f[i][1];
 		int v_3 = f[i][2];
 
-		glColor3f(1, 0, 0); glVertex3f(v[v_1 - 1][0], v[v_1 - 1][1], v[v_1 - 1][2]);
-		glColor3f(1, 0, 0); glVertex3f(v[v_2 - 1][0], v[v_2 - 1][1], v[v_2 - 1][2]);
-		glColor3f(1, 0, 1); glVertex3f(v[v_3 - 1][0], v[v_3 - 1][1], v[v_3 - 1][2]);
+		glColor3fv(vertex_color[0]); glVertex3fv(v[v_1 - 1]);
+		glColor3fv(vertex_color[1]); glVertex3fv(v[v_2 - 1]);
+		glColor3fv(vertex_color[2]); glVertex3fv(v[v_3 - 1]);
 	}
 
-	// glColor3f(1, 0, 0); glVertex2f(-0.6, -0.75);
-	// glColor3f(0, 1, 0); glVertex2f(0.6, -0.75);
-	// glColor3f(0, 0, 1); glVertex2f(0, 0.75);
 	glEnd();
 	glFlush();
+}
+
+void mouse(int button, int state, int x, int y) {
+	switch(button) {
+		case GLUT_LEFT_BUTTON:
+			if(state == GLUT_DOWN) {
+				// Choose random colors for vertices
+				for(int i = 0 ; i < 3 ; i++)
+					for (int j = 0; j < 3; j++)
+						vertex_color[i][j] = (float)(rand() % 100) / 100;
+
+				glutPostRedisplay();
+			}
+			break;
+
+		case GLUT_RIGHT_BUTTON:
+			if(state == GLUT_DOWN) {
+				// Switch FILL, OUTLINE modes
+				if(is_polygon_mode_fill == true){
+					glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+					is_polygon_mode_fill = false;
+				}
+				else {
+					glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+					is_polygon_mode_fill = true;
+				}
+				
+				glutPostRedisplay();
+			}
+			break;
+	}
+
+	return;
+}
+
+void init() {
+	glClearColor(0.25, 0.25, 0.25, 0.0);
+
+	// Adjust model to be in centre of window and a bit larger
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTranslatef(0.2, -0.75, 0.0);
+	glScalef(4, 4, 4);
+
+	glPolygonMode(GL_FRONT, GL_FILL);
+
+	// Seed rand() for random colors to be generated on left click
+	srand(time(0));
+	return;
 }
 
 int main(int argc, char** argv) {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-	glutInitWindowPosition(80, 80);
-	glutInitWindowSize(400, 300);
-	glutCreateWindow("Triangle");
+
+	glutInitWindowPosition(250, 100);
+	glutInitWindowSize(800, 800);
+	glutCreateWindow("TRY CLICKING LEFT AND RIGHT MOUSE BUTTONS");
+	
+	init();
 	glutDisplayFunc(display);
+	glutMouseFunc(mouse);
 	glutMainLoop();
 
 	return 0;
